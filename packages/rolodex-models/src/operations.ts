@@ -8,7 +8,7 @@ import {
   parseListName,
   parseNewGroceryItems,
 } from "./grocery.ts";
-import { type NewRecipe, type RecipeView, parseNewRecipe } from "./recipe.ts";
+import { type NewRecipe, type RecipeDraft, type RecipeView, parseNewRecipe } from "./recipe.ts";
 import { ValidationError, asObject, trimmed } from "./validation.ts";
 
 // Every API operation is `POST /{OperationName}` with a JSON body of
@@ -57,13 +57,14 @@ export type DeleteRecipeOutput = EmptyOutput;
 
 export type NytRecipeUri = `${string}cooking.nytimes.com/recipes/${string}`;
 
-// Imports a recipe from NYT Cooking without saving it; the caller reviews it
-// and saves it with CreateRecipe.
+// Imports a recipe from NYT Cooking without saving it; the caller reviews it,
+// fills in any ingredient amounts or units it couldn't read, and saves it with
+// CreateRecipe.
 export interface FeedRecipeInput {
   uri: NytRecipeUri;
 }
 export interface FeedRecipeOutput {
-  recipe: NewRecipe;
+  recipe: RecipeDraft;
 }
 
 // Grocery lists

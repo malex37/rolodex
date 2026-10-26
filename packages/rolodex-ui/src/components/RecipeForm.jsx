@@ -1,8 +1,21 @@
-import { parseNewRecipe } from '@rolodex/models'
+import { UNITS, formatAmount, parseNewRecipe, unitLabel } from '@rolodex/models'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider.jsx'
 
-const emptyIngredient = { name: '', quantity: '' }
+// Form rows hold text: amount as typed ("1/4", "0.25"), unit "" until chosen.
+const emptyIngredient = { name: '', amount: '', unit: '' }
+
+// A saved ingredient or an imported draft (amount/unit may be missing) as a form row.
+const toRow = (item) => ({
+  name: item.name,
+  amount: item.amount ? formatAmount(item.amount) : '',
+  unit: item.unit ?? '',
+})
+
+const toRows = (items) => (items?.length ? items.map(toRow) : [{ ...emptyIngredient }])
+
+// A decimal (0.25), fraction (1/4) or mixed number (1 1/2), for the browser's own check.
+const AMOUNT_PATTERN = String.raw`\s*(\d+\s+\d+/\d+|\d+/\d+|\d*\.\d+|\d+)\s*`
 
 // Creates a recipe, or edits `recipe` when given one.
 export default function RecipeForm({ recipe: initial, onSave, onCancel }) {
@@ -10,9 +23,7 @@ export default function RecipeForm({ recipe: initial, onSave, onCancel }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [category, setCategory] = useState(initial?.category ?? '')
   const [tags, setTags] = useState(initial?.tags.join(', ') ?? '')
-  const [ingredients, setIngredients] = useState(
-    initial?.ingredients.length ? initial.ingredients : [{ ...emptyIngredient }],
-  )
+  const [ingredients, setIngredients] = useState(() => toRows(initial?.ingredients))
   const [steps, setSteps] = useState(initial?.steps.length ? initial.steps : [''])
   const [isPrivate, setIsPrivate] = useState(initial?.private ?? false)
   const [saving, setSaving] = useState(false)
@@ -31,7 +42,7 @@ export default function RecipeForm({ recipe: initial, onSave, onCancel }) {
       setName(recipe.name)
       setCategory(recipe.category)
       setTags(recipe.tags.join(', '))
-      setIngredients(recipe.ingredients.length ? recipe.ingredients : [{ ...emptyIngredient }])
+      setIngredients(toRows(recipe.ingredients))
       setSteps(recipe.steps.length ? recipe.steps : [''])
     } catch (err) {
       setFetchError(err.message)
@@ -131,24 +142,46 @@ export default function RecipeForm({ recipe: initial, onSave, onCancel }) {
 
         <fieldset className="grid gap-2">
           <legend className="mb-2 text-sm font-medium">Ingredients</legend>
-          {ingredients.map((item, i) => (
-            <div className="flex flex-wrap gap-2" key={i}>
-              <input
-                className="input flex-[2_1_10rem]"
-                aria-label="Ingredient"
-                placeholder="Ingredient"
-                value={item.name}
-                onChange={(e) => updateIngredient(i, 'name', e.target.value)}
-              />
-              <input
-                className="input flex-[1_1_6rem]"
-                aria-label="Quantity"
-                placeholder="Quantity"
-                value={item.quantity}
-                onChange={(e) => updateIngredient(i, 'quantity', e.target.value)}
-              />
-            </div>
-          ))}
+          {ingredients.map((item, i) => {
+            // Once a row is started, all three fields are required.
+            const started = Boolean(item.name || item.amount || item.unit)
+            return (
+              <div className="flex flex-wrap gap-2" key={i}>
+                <input
+                  className="input flex-[1_1_5rem]"
+                  aria-label={`Ingredient ${i + 1} amount`}
+                  placeholder="1/4 or 0.25"
+                  value={item.amount}
+                  onChange={(e) => updateIngredient(i, 'amount', e.target.value)}
+                  pattern={AMOUNT_PATTERN}
+                  title="A number like 0.25, 1/4 or 1 1/2"
+                  required={started}
+                />
+                <select
+                  className="input flex-[1_1_7rem]"
+                  aria-label={`Ingredient ${i + 1} unit`}
+                  value={item.unit}
+                  onChange={(e) => updateIngredient(i, 'unit', e.target.value)}
+                  required={started}
+                >
+                  <option value="">Unit…</option>
+                  {UNITS.map((unit) => (
+                    <option key={unit} value={unit}>
+                      {unitLabel(unit)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="input flex-[3_1_10rem]"
+                  aria-label={`Ingredient ${i + 1} name`}
+                  placeholder="Ingredient"
+                  value={item.name}
+                  onChange={(e) => updateIngredient(i, 'name', e.target.value)}
+                  required={started}
+                />
+              </div>
+            )
+          })}
           <button
             type="button"
             className="btn justify-self-start"

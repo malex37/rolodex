@@ -1,3 +1,4 @@
+import { formatQuantity } from '@rolodex/models'
 import { useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
@@ -23,7 +24,10 @@ export default function RecipeDetail() {
     setAddError('')
     try {
       const targetId = listId || (await createList('Shopping list')).id
-      await client.addGroceries({ listId: targetId, items: recipe.ingredients })
+      await client.addGroceries({
+        listId: targetId,
+        items: recipe.ingredients.map((item) => ({ name: item.name, quantity: formatQuantity(item) })),
+      })
       navigate(`/groceries/${targetId}`)
     } catch (err) {
       setAddError(err.message)
@@ -108,7 +112,7 @@ export default function RecipeDetail() {
             <ul className="list-disc space-y-1 pl-5">
               {recipe.ingredients.map((item, i) => (
                 <li key={i}>
-                  {item.quantity && <strong>{item.quantity} </strong>}
+                  <strong>{formatQuantity(item)} </strong>
                   {item.name}
                 </li>
               ))}
