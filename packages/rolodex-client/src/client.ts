@@ -8,6 +8,8 @@ import type {
   DeleteRecipeInput,
   DeleteRecipeOutput,
   ErrorOutput,
+  FeedRecipeInput,
+  FeedRecipeOutput,
   GetRecipeInput,
   GetRecipeOutput,
   ListGroceriesInput,
@@ -75,6 +77,11 @@ export class RolodexClient {
 
   deleteRecipe(input: DeleteRecipeInput): Promise<DeleteRecipeOutput> {
     return this.#call("DeleteRecipe", input);
+  }
+
+  /** Reads a recipe from a NYT Cooking page without saving it. */
+  feedRecipe(input: FeedRecipeInput): Promise<FeedRecipeOutput> {
+    return this.#call("FeedRecipe", input);
   }
 
   listGroceries(input: ListGroceriesInput = {}): Promise<ListGroceriesOutput> {

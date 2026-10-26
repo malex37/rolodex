@@ -45,12 +45,13 @@ const DEV_ORIGIN = "http://localhost:5173";
 // Every operation is `POST /{OperationName}`, handled by the export of the same
 // name in packages/rolodex-api/src/handlers/{file}.ts.
 const operations: {
-  [N in OperationName]: { file: "recipes" | "groceries"; write: boolean };
+  [N in OperationName]: { file: "recipes" | "groceries" | "feed"; write: boolean };
 } = {
   ListRecipes: { file: "recipes", write: false },
   GetRecipe: { file: "recipes", write: false },
   CreateRecipe: { file: "recipes", write: true },
   DeleteRecipe: { file: "recipes", write: true },
+  FeedRecipe: { file: "feed", write: false },
   ListGroceries: { file: "groceries", write: false },
   AddGroceries: { file: "groceries", write: true },
   UpdateGrocery: { file: "groceries", write: true },

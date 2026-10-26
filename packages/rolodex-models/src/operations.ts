@@ -39,6 +39,17 @@ export interface DeleteRecipeInput {
 }
 export type DeleteRecipeOutput = EmptyOutput;
 
+export type NytRecipeUri = `${string}cooking.nytimes.com/recipes/${string}`;
+
+// Imports a recipe from NYT Cooking without saving it; the caller reviews it
+// and saves it with CreateRecipe.
+export interface FeedRecipeInput {
+  uri: NytRecipeUri;
+}
+export interface FeedRecipeOutput {
+  recipe: NewRecipe;
+}
+
 // Groceries
 
 export type ListGroceriesInput = Record<string, never>;
@@ -82,6 +93,7 @@ export interface RolodexOperations {
   GetRecipe: { input: GetRecipeInput; output: GetRecipeOutput };
   CreateRecipe: { input: CreateRecipeInput; output: CreateRecipeOutput };
   DeleteRecipe: { input: DeleteRecipeInput; output: DeleteRecipeOutput };
+  FeedRecipe: { input: FeedRecipeInput; output: FeedRecipeOutput };
   ListGroceries: { input: ListGroceriesInput; output: ListGroceriesOutput };
   AddGroceries: { input: AddGroceriesInput; output: AddGroceriesOutput };
   UpdateGrocery: { input: UpdateGroceryInput; output: UpdateGroceryOutput };
@@ -105,6 +117,22 @@ function parseEmpty(input: unknown): Record<string, never> {
   return {};
 }
 
+// The template type alone would accept e.g. "https://evil.example/?cooking.nytimes.com/recipes/",
+// so check the parsed host and rebuild the URL from its path.
+function parseNytRecipeUri(input: unknown): FeedRecipeInput {
+  const raw = trimmed(asObject(input, "Input").uri);
+  let url: URL;
+  try {
+    url = new URL(raw.startsWith("//") ? `https:${raw}` : raw);
+  } catch {
+    throw new ValidationError("uri must be a URL");
+  }
+  if (url.hostname !== "cooking.nytimes.com" || !url.pathname.startsWith("/recipes/")) {
+    throw new ValidationError("uri must be a cooking.nytimes.com/recipes/ URL");
+  }
+  return { uri: `https://cooking.nytimes.com${url.pathname}` as NytRecipeUri };
+}
+
 export const inputParsers: {
   [N in OperationName]: (input: unknown) => OperationInput<N>;
 } = {
@@ -112,6 +140,7 @@ export const inputParsers: {
   GetRecipe: parseId,
   CreateRecipe: (input) => ({ recipe: parseNewRecipe(asObject(input, "Input").recipe) }),
   DeleteRecipe: parseId,
+  FeedRecipe: parseNytRecipeUri,
   ListGroceries: parseEmpty,
   AddGroceries: (input) => ({ items: parseNewGroceryItems(asObject(input, "Input").items) }),
   UpdateGrocery: (input) => ({
