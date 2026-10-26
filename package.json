@@ -1,0 +1,19 @@
+{
+  "name": "rolodex",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @rolodex/ui",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "synth": "npm run build -w @rolodex/ui && npm run synth -w @rolodex/cdk",
+    "cdk": "npm run cdk -w @rolodex/cdk --",
+    "deploy": "npm run build -w @rolodex/ui && npm run deploy -w @rolodex/cdk",
+    "rolo": "npm run start -w @rolodex/cli --"
+  }
+}

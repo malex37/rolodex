@@ -1,0 +1,9 @@
+{
+  "app": "npx tsx bin/rolodex.ts",
+  "watch": {
+    "include": ["bin/**", "lib/**", "../rolodex-api/src/**", "../rolodex-models/src/**"]
+  },
+  "context": {
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

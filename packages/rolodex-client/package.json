@@ -1,0 +1,19 @@
+{
+  "name": "@rolodex/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@rolodex/models": "*",
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

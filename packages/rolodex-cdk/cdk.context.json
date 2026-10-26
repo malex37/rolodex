@@ -1,0 +1,10 @@
+{
+  "hosted-zone:account=490433457471:domainName=iammalex.com:region=us-east-1": {
+    "Id": "/hostedzone/Z07619652D1ZGLP1EZPC3",
+    "Name": "iammalex.com."
+  },
+  "hosted-zone:account=490433457471:domainName=iammalex.com:region=us-west-2": {
+    "Id": "/hostedzone/Z07619652D1ZGLP1EZPC3",
+    "Name": "iammalex.com."
+  }
+}
