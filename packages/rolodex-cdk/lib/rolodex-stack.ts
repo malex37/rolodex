@@ -43,15 +43,25 @@ const API_URL = `https://${API_DOMAIN}`;
 const DEV_ORIGIN = "http://localhost:5173";
 
 // Every operation is `POST /{OperationName}`, handled by the export of the same
-// name in packages/rolodex-api/src/handlers/{file}.ts.
+// name in packages/rolodex-api/src/handlers/{file}.ts. `users` operations look
+// users up in the user pool (to share lists by email).
 const operations: {
-  [N in OperationName]: { file: "recipes" | "groceries" | "feed"; write: boolean };
+  [N in OperationName]: {
+    file: "recipes" | "groceries" | "feed";
+    write: boolean;
+    users?: boolean;
+  };
 } = {
   ListRecipes: { file: "recipes", write: false },
   GetRecipe: { file: "recipes", write: false },
   CreateRecipe: { file: "recipes", write: true },
   DeleteRecipe: { file: "recipes", write: true },
   FeedRecipe: { file: "feed", write: false },
+  ListGroceryLists: { file: "groceries", write: false },
+  CreateGroceryList: { file: "groceries", write: true, users: true },
+  DeleteGroceryList: { file: "groceries", write: true },
+  ShareGroceryList: { file: "groceries", write: true, users: true },
+  UnshareGroceryList: { file: "groceries", write: true },
   ListGroceries: { file: "groceries", write: false },
   AddGroceries: { file: "groceries", write: true },
   UpdateGrocery: { file: "groceries", write: true },
@@ -166,7 +176,7 @@ function handler(event) {
       }),
     );
 
-    for (const [name, { file, write }] of Object.entries(operations)) {
+    for (const [name, { file, write, users: lookupUsers }] of Object.entries(operations)) {
       const fn = new NodejsFunction(this, `Fn-${name}`, {
         entry: join(handlersDir, `${file}.ts`),
         handler: name,
@@ -178,7 +188,10 @@ function handler(event) {
           retention: RetentionDays.ONE_WEEK,
           removalPolicy: RemovalPolicy.DESTROY,
         }),
-        environment: { TABLE_NAME: table.tableName },
+        environment: {
+          TABLE_NAME: table.tableName,
+          ...(lookupUsers && { USER_POOL_ID: users.userPool.userPoolId }),
+        },
         bundling: {
           format: OutputFormat.ESM,
           minify: true,
@@ -190,6 +203,7 @@ function handler(event) {
 
       if (write) table.grantReadWriteData(fn);
       else table.grantReadData(fn);
+      if (lookupUsers) users.userPool.grant(fn, "cognito-idp:ListUsers");
 
       api.addRoutes({
         path: `/${name}`,

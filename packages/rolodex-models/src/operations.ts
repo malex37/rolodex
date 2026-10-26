@@ -1,8 +1,11 @@
 import {
   type GroceryItem,
+  type GroceryListView,
   type GroceryUpdate,
   type NewGroceryItem,
+  parseEmail,
   parseGroceryUpdate,
+  parseListName,
   parseNewGroceryItems,
 } from "./grocery.ts";
 import { type NewRecipe, type RecipeView, parseNewRecipe } from "./recipe.ts";
@@ -54,14 +57,56 @@ export interface FeedRecipeOutput {
   recipe: NewRecipe;
 }
 
-// Groceries
+// Grocery lists
 
-export type ListGroceriesInput = Record<string, never>;
+// A user sees the lists they own or that were shared with them; any other
+// list is reported as NotFound. Only the owner can share, rename or delete a
+// list; members can change its items and leave it.
+
+export type ListGroceryListsInput = Record<string, never>;
+export interface ListGroceryListsOutput {
+  lists: GroceryListView[];
+}
+
+export interface CreateGroceryListInput {
+  name: string;
+}
+export interface CreateGroceryListOutput {
+  list: GroceryListView;
+}
+
+export interface DeleteGroceryListInput {
+  id: string;
+}
+export type DeleteGroceryListOutput = EmptyOutput;
+
+/** Gives the user with this email access to the list. */
+export interface ShareGroceryListInput {
+  id: string;
+  email: string;
+}
+export interface ShareGroceryListOutput {
+  list: GroceryListView;
+}
+
+/** The owner removes a member, or a member removes themselves (leaves). */
+export interface UnshareGroceryListInput {
+  id: string;
+  userId: string;
+}
+export type UnshareGroceryListOutput = EmptyOutput;
+
+// Grocery items, always within a list
+
+export interface ListGroceriesInput {
+  listId: string;
+}
 export interface ListGroceriesOutput {
   items: GroceryItem[];
 }
 
 export interface AddGroceriesInput {
+  listId: string;
   items: NewGroceryItem[];
 }
 export interface AddGroceriesOutput {
@@ -69,6 +114,7 @@ export interface AddGroceriesOutput {
 }
 
 export interface UpdateGroceryInput {
+  listId: string;
   id: string;
   changes: GroceryUpdate;
 }
@@ -77,6 +123,7 @@ export interface UpdateGroceryOutput {
 }
 
 export interface DeleteGroceryInput {
+  listId: string;
   id: string;
 }
 export type DeleteGroceryOutput = EmptyOutput;
@@ -98,6 +145,11 @@ export interface RolodexOperations {
   CreateRecipe: { input: CreateRecipeInput; output: CreateRecipeOutput };
   DeleteRecipe: { input: DeleteRecipeInput; output: DeleteRecipeOutput };
   FeedRecipe: { input: FeedRecipeInput; output: FeedRecipeOutput };
+  ListGroceryLists: { input: ListGroceryListsInput; output: ListGroceryListsOutput };
+  CreateGroceryList: { input: CreateGroceryListInput; output: CreateGroceryListOutput };
+  DeleteGroceryList: { input: DeleteGroceryListInput; output: DeleteGroceryListOutput };
+  ShareGroceryList: { input: ShareGroceryListInput; output: ShareGroceryListOutput };
+  UnshareGroceryList: { input: UnshareGroceryListInput; output: UnshareGroceryListOutput };
   ListGroceries: { input: ListGroceriesInput; output: ListGroceriesOutput };
   AddGroceries: { input: AddGroceriesInput; output: AddGroceriesOutput };
   UpdateGrocery: { input: UpdateGroceryInput; output: UpdateGroceryOutput };
@@ -114,6 +166,12 @@ function parseId(input: unknown): { id: string } {
   const id = trimmed(asObject(input, "Input").id);
   if (!id) throw new ValidationError("id is required");
   return { id };
+}
+
+function parseListId(input: unknown): { listId: string } {
+  const listId = trimmed(asObject(input, "Input").listId);
+  if (!listId) throw new ValidationError("listId is required");
+  return { listId };
 }
 
 function parseEmpty(input: unknown): Record<string, never> {
@@ -145,11 +203,27 @@ export const inputParsers: {
   CreateRecipe: (input) => ({ recipe: parseNewRecipe(asObject(input, "Input").recipe) }),
   DeleteRecipe: parseId,
   FeedRecipe: parseNytRecipeUri,
-  ListGroceries: parseEmpty,
-  AddGroceries: (input) => ({ items: parseNewGroceryItems(asObject(input, "Input").items) }),
+  ListGroceryLists: parseEmpty,
+  CreateGroceryList: (input) => ({ name: parseListName(asObject(input, "Input").name) }),
+  DeleteGroceryList: parseId,
+  ShareGroceryList: (input) => ({
+    ...parseId(input),
+    email: parseEmail(asObject(input, "Input").email),
+  }),
+  UnshareGroceryList: (input) => {
+    const userId = trimmed(asObject(input, "Input").userId);
+    if (!userId) throw new ValidationError("userId is required");
+    return { ...parseId(input), userId };
+  },
+  ListGroceries: parseListId,
+  AddGroceries: (input) => ({
+    ...parseListId(input),
+    items: parseNewGroceryItems(asObject(input, "Input").items),
+  }),
   UpdateGrocery: (input) => ({
+    ...parseListId(input),
     ...parseId(input),
     changes: parseGroceryUpdate(asObject(input, "Input").changes),
   }),
-  DeleteGrocery: parseId,
+  DeleteGrocery: (input) => ({ ...parseListId(input), ...parseId(input) }),
 };

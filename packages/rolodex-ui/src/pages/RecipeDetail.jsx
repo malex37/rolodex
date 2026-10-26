@@ -1,14 +1,34 @@
 import { useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider.jsx'
 import PrivateBadge from '../components/PrivateBadge.jsx'
 
 export default function RecipeDetail() {
   const { id } = useParams()
-  const { recipes, recipesError, deleteRecipe, addGroceries } = useOutletContext()
+  const { client } = useAuth()
+  const { recipes, recipesError, deleteRecipe, lists, createList } = useOutletContext()
   const navigate = useNavigate()
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [chosenListId, setChosenListId] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState('')
   const recipe = recipes?.find((r) => r.id === id)
+  const listId = chosenListId || lists?.[0]?.id || ''
+
+  // Adds the ingredients to the chosen list, creating a first list if needed.
+  const handleAddToList = async () => {
+    setAdding(true)
+    setAddError('')
+    try {
+      const targetId = listId || (await createList('Shopping list')).id
+      await client.addGroceries({ listId: targetId, items: recipe.ingredients })
+      navigate(`/groceries/${targetId}`)
+    } catch (err) {
+      setAddError(err.message)
+      setAdding(false)
+    }
+  }
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -92,16 +112,33 @@ export default function RecipeDetail() {
         )}
 
         <div className="flex flex-wrap gap-2">
+          {lists?.length > 1 && (
+            <select
+              className="input w-auto"
+              aria-label="Shopping list"
+              value={listId}
+              onChange={(e) => setChosenListId(e.target.value)}
+            >
+              {lists.map((list) => (
+                <option key={list.id} value={list.id}>
+                  {list.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="button"
             className="btn btn-primary"
-            disabled={recipe.ingredients.length === 0}
-            onClick={() => {
-              addGroceries(recipe.ingredients)
-              navigate('/groceries')
-            }}
+            disabled={recipe.ingredients.length === 0 || !lists || adding}
+            onClick={handleAddToList}
           >
-            Add to groceries
+            {adding
+              ? 'Adding…'
+              : lists?.length === 1
+                ? `Add to ${lists[0].name}`
+                : lists?.length === 0
+                  ? 'Add to a new shopping list'
+                  : 'Add to list'}
           </button>
           {/* Only the owner can delete; ownerless (older) recipes by anyone. */}
           {(recipe.mine || !recipe.ownerId) && (
@@ -110,6 +147,11 @@ export default function RecipeDetail() {
             </button>
           )}
         </div>
+        {addError && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            {addError}
+          </p>
+        )}
         {deleteError && (
           <p className="text-sm text-red-600 dark:text-red-400" role="alert">
             {deleteError}

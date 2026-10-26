@@ -11,6 +11,9 @@ export function tableName(): string {
   return name;
 }
 
-// Single-table layout: pk is the entity type, sk is the item id.
+// Single-table layout: pk is the entity type (or a list's item partition),
+// sk is the item id.
 export const RECIPE_PK = "RECIPE";
-export const GROCERY_PK = "GROCERY";
+export const GROCERY_LIST_PK = "GROCERY_LIST";
+/** Partition holding one grocery list's items. */
+export const groceryItemsPk = (listId: string) => `GROCERY_LIST#${listId}`;

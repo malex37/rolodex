@@ -7,7 +7,7 @@ export interface Ingredient {
 
 export interface Recipe {
   id: string;
-  /** Cognito identity id of the user who created it. */
+  /** Id (Cognito user pool sub) of the user who created it. */
   ownerId: string;
   /** Private recipes are only visible to their owner; others are visible to every user. */
   private: boolean;

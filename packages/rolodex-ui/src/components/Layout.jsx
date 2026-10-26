@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
-import { useLocalStorage } from '../hooks/useLocalStorage.js'
 
 const navClass = ({ isActive }) =>
   `rounded-md px-3 py-1.5 text-sm font-medium ${
@@ -16,7 +15,9 @@ export default function Layout() {
   // own private ones. null while loading.
   const [recipes, setRecipes] = useState(null)
   const [recipesError, setRecipesError] = useState('')
-  const [groceries, setGroceries] = useLocalStorage('rolodex.groceries', [])
+  // Shopping lists the user owns or that were shared with them. null while loading.
+  const [lists, setLists] = useState(null)
+  const [listsError, setListsError] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -29,6 +30,22 @@ export default function Layout() {
     }
   }, [client])
 
+  const reloadLists = useCallback(
+    () =>
+      client
+        .listGroceryLists()
+        .then(({ lists }) => {
+          setLists(lists)
+          setListsError('')
+        })
+        .catch((err) => setListsError(err.message)),
+    [client],
+  )
+
+  useEffect(() => {
+    reloadLists()
+  }, [reloadLists])
+
   const createRecipe = async (newRecipe) => {
     const { recipe } = await client.createRecipe({ recipe: newRecipe })
     setRecipes((list) => [...(list ?? []), recipe])
@@ -40,18 +57,17 @@ export default function Layout() {
     setRecipes((list) => list.filter((r) => r.id !== id))
   }
 
-  const addGroceries = (entries) =>
-    setGroceries((list) => [
-      ...list,
-      ...entries.map(({ name, quantity }) => ({
-        id: crypto.randomUUID(),
-        name,
-        quantity,
-        done: false,
-      })),
-    ])
+  const createList = async (name) => {
+    const { list } = await client.createGroceryList({ name })
+    setLists((current) => [...(current ?? []), list])
+    return list
+  }
 
-  const pendingCount = groceries.filter((item) => !item.done).length
+  // Replaces (or, with null, removes) one list after a change.
+  const updateList = (id, list) =>
+    setLists((current) =>
+      list ? current.map((l) => (l.id === id ? list : l)) : current.filter((l) => l.id !== id),
+    )
 
   return (
     <div className="mx-auto min-h-svh max-w-2xl px-4 pt-6 pb-16">
@@ -62,7 +78,7 @@ export default function Layout() {
             Recipes
           </NavLink>
           <NavLink to="/groceries" className={navClass}>
-            Shopping list{pendingCount > 0 && ` (${pendingCount})`}
+            Shopping lists
           </NavLink>
           <button type="button" className="btn" title={email ?? undefined} onClick={signOut}>
             Sign out
@@ -76,9 +92,11 @@ export default function Layout() {
           recipesError,
           createRecipe,
           deleteRecipe,
-          groceries,
-          setGroceries,
-          addGroceries,
+          lists,
+          listsError,
+          reloadLists,
+          createList,
+          updateList,
         }}
       />
     </div>

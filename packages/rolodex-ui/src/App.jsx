@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import RequireAuth from './auth/RequireAuth.jsx'
 import Layout from './components/Layout.jsx'
+import GroceryLists from './pages/GroceryLists.jsx'
 import Login from './pages/Login.jsx'
 import NewRecipe from './pages/NewRecipe.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -25,7 +26,10 @@ function App() {
           <Route path="new" element={<NewRecipe />} />
           <Route path=":id" element={<RecipeDetail />} />
         </Route>
-        <Route path="groceries" element={<ShoppingList />} />
+        <Route path="groceries">
+          <Route index element={<GroceryLists />} />
+          <Route path=":listId" element={<ShoppingList />} />
+        </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

@@ -16,8 +16,19 @@ function fromItem({ pk: _pk, sk: _sk, ...item }: Record<string, unknown>): Recip
   return { ownerId: "", private: false, ...item } as unknown as Recipe;
 }
 
+// Recipes created before user ids were used store the owner's identity pool
+// id instead, so either counts as the caller's.
+function ownedBy(recipe: Recipe, caller: Caller): boolean {
+  return recipe.ownerId === caller.id || recipe.ownerId === caller.identityId;
+}
+
+// Expression values for "ownerId IN (:me, :meLegacy)".
+function ownerValues(caller: Caller) {
+  return { ":me": caller.id, ":meLegacy": caller.identityId ?? caller.id };
+}
+
 function view(recipe: Recipe, caller: Caller): RecipeView {
-  return { ...recipe, mine: recipe.ownerId === caller.id };
+  return { ...recipe, mine: ownedBy(recipe, caller) };
 }
 
 export const ListRecipes = operation("ListRecipes", async (_input, caller) => {
@@ -28,9 +39,9 @@ export const ListRecipes = operation("ListRecipes", async (_input, caller) => {
       new QueryCommand({
         TableName: tableName(),
         KeyConditionExpression: "pk = :pk",
-        FilterExpression: "attribute_not_exists(#private) OR #private = :false OR ownerId = :me",
+        FilterExpression: "attribute_not_exists(#private) OR #private = :false OR ownerId IN (:me, :meLegacy)",
         ExpressionAttributeNames: { "#private": "private" },
-        ExpressionAttributeValues: { ":pk": RECIPE_PK, ":false": false, ":me": caller.id },
+        ExpressionAttributeValues: { ":pk": RECIPE_PK, ":false": false, ...ownerValues(caller) },
         ExclusiveStartKey,
       }),
     );
@@ -46,7 +57,7 @@ export const GetRecipe = operation("GetRecipe", async ({ id }, caller) => {
   );
   const recipe = result.Item && fromItem(result.Item);
   // Someone else's private recipe looks the same as a missing one.
-  if (!recipe || (recipe.private && recipe.ownerId !== caller.id)) {
+  if (!recipe || (recipe.private && !ownedBy(recipe, caller))) {
     throw new NotFoundError("Recipe not found");
   }
   return { recipe: view(recipe, caller) };
@@ -70,8 +81,8 @@ export const DeleteRecipe = operation("DeleteRecipe", async ({ id }, caller) => 
         TableName: tableName(),
         Key: { pk: RECIPE_PK, sk: id },
         // Owner only; ownerless (pre-ownership) recipes can be deleted by anyone.
-        ConditionExpression: "attribute_not_exists(ownerId) OR ownerId = :me",
-        ExpressionAttributeValues: { ":me": caller.id },
+        ConditionExpression: "attribute_not_exists(ownerId) OR ownerId IN (:me, :meLegacy)",
+        ExpressionAttributeValues: ownerValues(caller),
       }),
     );
   } catch (err) {

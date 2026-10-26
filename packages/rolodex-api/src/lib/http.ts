@@ -38,28 +38,39 @@ export class ForbiddenError extends ApiError {
   }
 }
 
-/** Who is calling: their Cognito identity id. */
+/** Who is calling: their user id (Cognito user pool sub). */
 export interface Caller {
   id: string;
+  /**
+   * Their identity pool id, which recipes created before user ids were used
+   * stored as ownerId (see ownedBy in handlers/recipes.ts).
+   */
+  identityId?: string;
 }
 
 // The IAM authorizer's context. For identity pool credentials it includes the
-// caller's Cognito identity (aws-lambda's types leave this out).
+// caller's Cognito identity (aws-lambda's types leave this out). Its `amr`
+// lists how they signed in, including
+// "cognito-idp.{region}.amazonaws.com/{userPoolId}:CognitoSignIn:{sub}".
 interface IamAuthorizer {
   iam?: {
     userArn?: string;
-    cognitoIdentity?: { identityId?: string } | null;
+    cognitoIdentity?: { amr?: string[]; identityId?: string } | null;
   };
 }
 
 function getCaller(event: APIGatewayProxyEventV2): Caller {
   const authorizer = (event.requestContext as { authorizer?: IamAuthorizer } | undefined)
     ?.authorizer;
-  // Signed-in users call with identity pool credentials; any other IAM
-  // principal (e.g. an admin invoking directly) is identified by its ARN.
-  const id = authorizer?.iam?.cognitoIdentity?.identityId ?? authorizer?.iam?.userArn;
+  // The user pool sub identifies a signed-in user across sessions and lets us
+  // look up their email. Any other IAM principal (e.g. an admin invoking
+  // directly) is identified by its ARN.
+  const sub = authorizer?.iam?.cognitoIdentity?.amr
+    ?.map((entry) => entry.match(/:CognitoSignIn:(.+)$/)?.[1])
+    .find(Boolean);
+  const id = sub ?? authorizer?.iam?.userArn;
   if (!id) throw new ForbiddenError("Caller identity is missing");
-  return { id };
+  return { id, identityId: authorizer?.iam?.cognitoIdentity?.identityId };
 }
 
 function json(statusCode: number, body: unknown): APIGatewayProxyStructuredResultV2 {

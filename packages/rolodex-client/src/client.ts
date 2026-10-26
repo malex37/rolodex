@@ -1,9 +1,13 @@
 import type {
   AddGroceriesInput,
   AddGroceriesOutput,
+  CreateGroceryListInput,
+  CreateGroceryListOutput,
   CreateRecipeInput,
   CreateRecipeOutput,
   DeleteGroceryInput,
+  DeleteGroceryListInput,
+  DeleteGroceryListOutput,
   DeleteGroceryOutput,
   DeleteRecipeInput,
   DeleteRecipeOutput,
@@ -14,11 +18,17 @@ import type {
   GetRecipeOutput,
   ListGroceriesInput,
   ListGroceriesOutput,
+  ListGroceryListsInput,
+  ListGroceryListsOutput,
   ListRecipesInput,
   ListRecipesOutput,
   OperationInput,
   OperationName,
   OperationOutput,
+  ShareGroceryListInput,
+  ShareGroceryListOutput,
+  UnshareGroceryListInput,
+  UnshareGroceryListOutput,
   UpdateGroceryInput,
   UpdateGroceryOutput,
 } from "@rolodex/models";
@@ -84,7 +94,27 @@ export class RolodexClient {
     return this.#call("FeedRecipe", input);
   }
 
-  listGroceries(input: ListGroceriesInput = {}): Promise<ListGroceriesOutput> {
+  listGroceryLists(input: ListGroceryListsInput = {}): Promise<ListGroceryListsOutput> {
+    return this.#call("ListGroceryLists", input);
+  }
+
+  createGroceryList(input: CreateGroceryListInput): Promise<CreateGroceryListOutput> {
+    return this.#call("CreateGroceryList", input);
+  }
+
+  deleteGroceryList(input: DeleteGroceryListInput): Promise<DeleteGroceryListOutput> {
+    return this.#call("DeleteGroceryList", input);
+  }
+
+  shareGroceryList(input: ShareGroceryListInput): Promise<ShareGroceryListOutput> {
+    return this.#call("ShareGroceryList", input);
+  }
+
+  unshareGroceryList(input: UnshareGroceryListInput): Promise<UnshareGroceryListOutput> {
+    return this.#call("UnshareGroceryList", input);
+  }
+
+  listGroceries(input: ListGroceriesInput): Promise<ListGroceriesOutput> {
     return this.#call("ListGroceries", input);
   }
 
