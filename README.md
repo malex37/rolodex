@@ -34,7 +34,8 @@ Everything deployed is pay-per-use; there are no hourly or provisioned resources
 npm install
 npm run typecheck
 npm run lint
-npm run dev        # UI on http://localhost:5173, needs packages/rolodex-ui/.env.local (see .env.example)
+npm run rolo -- sync-dev   # writes packages/rolodex-ui/.env.local from the deployed stack
+npm run dev        # UI on http://localhost:5173, against the deployed API and user pool
 ```
 
 # Deploying
@@ -47,8 +48,7 @@ npm run deploy     # builds the UI, deploys both stacks
 There is no self sign-up. Create users with:
 
 ```sh
-aws cognito-idp admin-create-user --user-pool-id <UserPoolId> --username you@example.com \
-  --user-attributes Name=email,Value=you@example.com Name=email_verified,Value=true
+npm run rolo -- users create --email you@example.com
 ```
 
 They get a temporary password by email and choose a new one on first sign-in.

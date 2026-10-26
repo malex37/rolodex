@@ -1,5 +1,5 @@
 import meow from "meow";
-import { Commands } from "./commands.ts";
+import { Commands, isOperation, type Operation } from "./commands.ts";
 
 async function main() {
   // With `commands` set, meow stops parsing at the command name, so everything
@@ -8,7 +8,7 @@ async function main() {
   const cli = meow(
     `
     Usage
-      $ rolo <command> <operation> [flags]
+      $ rolo <command> [operation] [flags]
 
     Commands:
       ${Commands.commands.reduce((acc, v) => `${acc}\n\t\t\t${v}`)}
@@ -23,24 +23,38 @@ async function main() {
     cli.showHelp();
     return;
   }
-  const [operation, ...rest] = cli.input;
   const command = Commands.command(arg_command);
   if (!command) {
     throw new Error(`Unknown command ${arg_command}`);
   }
-  if (!operation) {
-    throw new Error(`Command ${arg_command} requires an operation`);
+  // A single-operation command (`rolo sync-dev`) takes its flags directly;
+  // otherwise the first input names the operation (`rolo users create`).
+  let operation: string;
+  let sub_command: Operation | undefined;
+  let rest: string[];
+  if (isOperation(command)) {
+    operation = arg_command;
+    sub_command = command;
+    rest = cli.input;
+  } else {
+    const [name, ...args] = cli.input;
+    if (!name) {
+      throw new Error(`Command ${arg_command} requires an operation`);
+    }
+    operation = name;
+    sub_command = Commands.commandOperation(arg_command, name);
+    rest = args;
   }
-  const sub_command = Commands.commandOperation(arg_command, operation);
   if (!sub_command) {
     throw new Error(
       `Command ${arg_command} does not have an operation ${operation}`,
     );
   }
+  const usage = isOperation(command) ? arg_command : `${arg_command} ${operation}`;
   const sub_cli = meow(
     `
     Usage
-      $ rolo ${arg_command} ${operation} [flags]
+      $ rolo ${usage} [flags]
 
     ${sub_command.help}
 `,

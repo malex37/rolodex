@@ -1,4 +1,5 @@
 import type { AnyFlags, TypedFlags } from "meow";
+import { syncDev, SyncDevFlags } from "./dev/syncDev.ts";
 import { createUser, CreateUserFlags } from "./users/createUser.ts";
 
 export interface Operation<F extends AnyFlags = AnyFlags> {
@@ -14,6 +15,11 @@ export interface CommandOperations {
 
 export type Command = Record<string, Operation | CommandOperations>;
 
+/** A command is either a single operation (`rolo sync-dev`) or a group of them (`rolo users create`). */
+export function isOperation(value: Operation | CommandOperations): value is Operation {
+  return typeof value.handler === "function";
+}
+
 export const CommandRegistryMap = {
   users: {
     create: {
@@ -22,7 +28,12 @@ export const CommandRegistryMap = {
       flags: CreateUserFlags,
     },
   },
-} satisfies Record<string, CommandOperations>;
+  "sync-dev": {
+    help: "Write the deployed stack's values to packages/rolodex-ui/.env.local for npm run dev",
+    handler: syncDev,
+    flags: SyncDevFlags,
+  },
+} satisfies Command;
 
 export class CommandRegistry {
   private commandMap: Record<string, CommandOperations | Operation>;
