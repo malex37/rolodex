@@ -1,4 +1,4 @@
-import { formatQuantity } from '@rolodex/models'
+import { canConvert, convertQuantity, formatQuantity } from '@rolodex/models'
 import { useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
@@ -15,6 +15,8 @@ export default function RecipeDetail() {
   const [chosenListId, setChosenListId] = useState('')
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState('')
+  // null shows the recipe's own units; 'metric' or 'imperial' converts them for display.
+  const [system, setSystem] = useState(null)
   const recipe = recipes?.find((r) => r.id === id)
   const listId = chosenListId || lists?.[0]?.id || ''
 
@@ -63,6 +65,25 @@ export default function RecipeDetail() {
     )
   }
 
+  // Offer each system only if converting would change some ingredient.
+  const convertible = (target) => recipe.ingredients.some((item) => canConvert(item, target))
+  const menuItems = [
+    ...[
+      ['metric', 'Show metric units'],
+      ['imperial', 'Show imperial units'],
+    ]
+      .filter(([target]) => target !== system && convertible(target))
+      .map(([target, label]) => ({ label, onSelect: () => setSystem(target) })),
+    ...(system ? [{ label: 'Show original units', onSelect: () => setSystem(null) }] : []),
+    // Only the owner can edit or delete; ownerless (older) recipes by anyone.
+    ...(recipe.mine || !recipe.ownerId
+      ? [
+          { label: 'Edit', onSelect: () => navigate(`/recipes/${id}/edit`) },
+          { label: deleting ? 'Deleting…' : 'Delete', onSelect: handleDelete, danger: true },
+        ]
+      : []),
+  ]
+
   return (
     <article className="grid gap-4">
       <Link to="/recipes" className="text-sm text-orange-700 hover:underline dark:text-orange-300">
@@ -79,16 +100,7 @@ export default function RecipeDetail() {
                 {recipe.private && <PrivateBadge />}
               </h2>
             </div>
-            {/* Only the owner can edit or delete; ownerless (older) recipes by anyone. */}
-            {(recipe.mine || !recipe.ownerId) && (
-              <Menu
-                label="Recipe actions"
-                items={[
-                  { label: 'Edit', onSelect: () => navigate(`/recipes/${id}/edit`) },
-                  { label: deleting ? 'Deleting…' : 'Delete', onSelect: handleDelete, danger: true },
-                ]}
-              />
-            )}
+            {menuItems.length > 0 && <Menu label="Recipe actions" items={menuItems} />}
           </div>
           {recipe.tags.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1">
@@ -109,10 +121,22 @@ export default function RecipeDetail() {
         {recipe.ingredients.length > 0 && (
           <section>
             <h3 className="mb-2 font-semibold">Ingredients</h3>
+            {system && (
+              <p className="mb-2 text-sm text-stone-500">
+                Converted to {system} units (approximate).{' '}
+                <button
+                  type="button"
+                  className="text-orange-700 hover:underline dark:text-orange-300"
+                  onClick={() => setSystem(null)}
+                >
+                  Show original
+                </button>
+              </p>
+            )}
             <ul className="list-disc space-y-1 pl-5">
               {recipe.ingredients.map((item, i) => (
                 <li key={i}>
-                  <strong>{formatQuantity(item)} </strong>
+                  <strong>{formatQuantity(system ? convertQuantity(item, system) : item)} </strong>
                   {item.name}
                 </li>
               ))}

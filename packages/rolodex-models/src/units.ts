@@ -19,8 +19,14 @@ export function isUnit(value: unknown): value is Units {
   return typeof value === "string" && (UNITS as readonly string[]).includes(value);
 }
 
+/**
+ * Units a quantity can be shown in: the stored Units plus metric volumes,
+ * which only appear when converting imperial volumes for display.
+ */
+export type DisplayUnit = Units | "ml" | "liters";
+
 // How each unit reads after an amount: [one, many]. "whole" shows no unit.
-const UNIT_LABELS: Record<Units, [string, string]> = {
+const UNIT_LABELS: Record<DisplayUnit, [string, string]> = {
   whole: ["", ""],
   teaspoon: ["teaspoon", "teaspoons"],
   tablespoon: ["tablespoon", "tablespoons"],
@@ -30,6 +36,8 @@ const UNIT_LABELS: Record<Units, [string, string]> = {
   grams: ["gram", "grams"],
   kilograms: ["kilogram", "kilograms"],
   lbs: ["lb", "lbs"],
+  ml: ["ml", "ml"],
+  liters: ["liter", "liters"],
 };
 
 /** Name of a unit in a picker, e.g. "teaspoon" or "whole (count)". */
@@ -103,11 +111,82 @@ export function formatAmount(amount: number): string {
   return String(Math.round(amount * 100) / 100);
 }
 
-/** "1 1/2 cups", "1 tablespoon", "2" (whole). */
-export function formatQuantity({ amount, unit }: { amount: number; unit: Units }): string {
+export interface Quantity {
+  amount: number;
+  unit: DisplayUnit;
+}
+
+/** "1 1/2 cups", "1 tablespoon", "2" (whole), "2.5 ml". Metric amounts show as decimals. */
+export function formatQuantity({ amount, unit }: Quantity): string {
   const [one, many] = UNIT_LABELS[unit];
   const label = amount > 1 ? many : one;
-  return label ? `${formatAmount(amount)} ${label}` : formatAmount(amount);
+  const shown =
+    MEASURES[unit]?.system === "metric"
+      ? String(Math.round(amount * 100) / 100)
+      : formatAmount(amount);
+  return label ? `${shown} ${label}` : shown;
+}
+
+// Conversions between imperial and metric, for display only.
+
+export type MeasurementSystem = "imperial" | "metric";
+
+// Each convertible unit's system and its size in the base metric unit
+// (ml for volume, grams for weight). "whole" is neither and never converts.
+const MEASURES: Partial<Record<DisplayUnit, { system: MeasurementSystem; base: "ml" | "grams"; size: number }>> = {
+  teaspoon: { system: "imperial", base: "ml", size: 4.92892 },
+  tablespoon: { system: "imperial", base: "ml", size: 14.7868 },
+  cup: { system: "imperial", base: "ml", size: 236.588 },
+  "fl oz": { system: "imperial", base: "ml", size: 29.5735 },
+  oz: { system: "imperial", base: "grams", size: 28.3495 },
+  lbs: { system: "imperial", base: "grams", size: 453.592 },
+  ml: { system: "metric", base: "ml", size: 1 },
+  liters: { system: "metric", base: "ml", size: 1000 },
+  grams: { system: "metric", base: "grams", size: 1 },
+  kilograms: { system: "metric", base: "grams", size: 1000 },
+};
+
+/** True when convertQuantity would show this quantity differently in `system`. */
+export function canConvert(quantity: Quantity, system: MeasurementSystem): boolean {
+  const measure = MEASURES[quantity.unit];
+  return measure !== undefined && measure.system !== system;
+}
+
+// Metric reads best as round numbers (5 ml, 454 g, 1.25 kg).
+function roundMetric(amount: number, unit: DisplayUnit): Quantity {
+  const big = unit === "ml" ? "liters" : "kilograms";
+  if (amount >= 1000) return { amount: Math.round(amount / 10) / 100, unit: big };
+  return { amount: amount < 10 ? Math.round(amount * 10) / 10 : Math.round(amount), unit };
+}
+
+// Imperial reads best as eighths (3 1/2 oz, 1 1/8 lbs).
+function roundImperial(amount: number, unit: DisplayUnit): Quantity {
+  const eighths = Math.max(1, Math.round(amount * 8)) / 8;
+  return { amount: eighths, unit };
+}
+
+/**
+ * The quantity in `system`, approximately. Imperial volumes become ml or
+ * liters and weights grams or kilograms; metric weights become oz or lbs.
+ * Quantities already in `system`, and counts, come back unchanged.
+ */
+export function convertQuantity(quantity: Quantity, system: MeasurementSystem): Quantity {
+  const measure = MEASURES[quantity.unit];
+  if (!measure || measure.system === system) return quantity;
+
+  const base = quantity.amount * measure.size;
+  if (system === "metric") return roundMetric(base, measure.base);
+
+  // Metric to imperial: only weights can be stored in metric (grams, kilograms),
+  // and metric volumes only appear after converting, so map both by base.
+  if (measure.base === "ml") {
+    const flOz = base / MEASURES["fl oz"]!.size;
+    return flOz >= 8
+      ? roundImperial(flOz / 8, "cup")
+      : roundImperial(base / MEASURES.tablespoon!.size, "tablespoon");
+  }
+  const oz = base / MEASURES.oz!.size;
+  return oz >= 16 ? roundImperial(oz / 16, "lbs") : roundImperial(oz, "oz");
 }
 
 // Reading free-text ingredient lines ("½ cup unsalted butter, softened")
