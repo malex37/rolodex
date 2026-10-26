@@ -4,14 +4,17 @@ import { useAuth } from '../auth/AuthProvider.jsx'
 
 const emptyIngredient = { name: '', quantity: '' }
 
-export default function RecipeForm({ onSave, onCancel }) {
+// Creates a recipe, or edits `recipe` when given one.
+export default function RecipeForm({ recipe: initial, onSave, onCancel }) {
   const { client } = useAuth()
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [tags, setTags] = useState('')
-  const [ingredients, setIngredients] = useState([{ ...emptyIngredient }])
-  const [steps, setSteps] = useState([''])
-  const [isPrivate, setIsPrivate] = useState(false)
+  const [name, setName] = useState(initial?.name ?? '')
+  const [category, setCategory] = useState(initial?.category ?? '')
+  const [tags, setTags] = useState(initial?.tags.join(', ') ?? '')
+  const [ingredients, setIngredients] = useState(
+    initial?.ingredients.length ? initial.ingredients : [{ ...emptyIngredient }],
+  )
+  const [steps, setSteps] = useState(initial?.steps.length ? initial.steps : [''])
+  const [isPrivate, setIsPrivate] = useState(initial?.private ?? false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [pageUri, setPageUri] = useState('')
@@ -66,31 +69,34 @@ export default function RecipeForm({ onSave, onCancel }) {
 
   return (
     <div className="card grid gap-4">
-      <h2 className="text-xl font-semibold">New recipe</h2>
+      <h2 className="text-xl font-semibold">{initial ? 'Edit recipe' : 'New recipe'}</h2>
 
-      <form className="grid gap-1" onSubmit={handleFetch}>
-        <label className="grid gap-1 text-sm font-medium">
-          Get from page:
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="input flex-[1_1_16rem]"
-              type="url"
-              value={pageUri}
-              onChange={(e) => setPageUri(e.target.value)}
-              placeholder="https://cooking.nytimes.com/recipes/…"
-              required
-            />
-            <button type="submit" className="btn" disabled={fetching}>
-              {fetching ? 'Getting…' : 'Get recipe'}
-            </button>
-          </div>
-        </label>
-        {fetchError && (
-          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
-            {fetchError}
-          </p>
-        )}
-      </form>
+      {/* Importing would overwrite the fields, so only offer it for new recipes. */}
+      {!initial && (
+        <form className="grid gap-1" onSubmit={handleFetch}>
+          <label className="grid gap-1 text-sm font-medium">
+            Get from page:
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="input flex-[1_1_16rem]"
+                type="url"
+                value={pageUri}
+                onChange={(e) => setPageUri(e.target.value)}
+                placeholder="https://cooking.nytimes.com/recipes/…"
+                required
+              />
+              <button type="submit" className="btn" disabled={fetching}>
+                {fetching ? 'Getting…' : 'Get recipe'}
+              </button>
+            </div>
+          </label>
+          {fetchError && (
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {fetchError}
+            </p>
+          )}
+        </form>
+      )}
 
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <label className="grid gap-1 text-sm font-medium">
@@ -196,7 +202,7 @@ export default function RecipeForm({ onSave, onCancel }) {
 
         <div className="flex gap-2">
           <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Saving…' : 'Save recipe'}
+            {saving ? 'Saving…' : initial ? 'Save changes' : 'Save recipe'}
           </button>
           <button type="button" className="btn" onClick={onCancel}>
             Cancel

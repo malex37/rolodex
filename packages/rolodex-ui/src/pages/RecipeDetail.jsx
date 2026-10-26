@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
+import Menu from '../components/Menu.jsx'
 import PrivateBadge from '../components/PrivateBadge.jsx'
 
 export default function RecipeDetail() {
@@ -31,6 +32,7 @@ export default function RecipeDetail() {
   }
 
   const handleDelete = async () => {
+    if (!window.confirm(`Delete “${recipe.name}”?`)) return
     setDeleting(true)
     setDeleteError('')
     try {
@@ -65,11 +67,25 @@ export default function RecipeDetail() {
 
       <div className="card grid gap-4">
         <header>
-          <p className="text-sm text-stone-500">{recipe.category}</p>
-          <h2 className="text-2xl font-bold">
-            {recipe.name}
-            {recipe.private && <PrivateBadge />}
-          </h2>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-sm text-stone-500">{recipe.category}</p>
+              <h2 className="text-2xl font-bold">
+                {recipe.name}
+                {recipe.private && <PrivateBadge />}
+              </h2>
+            </div>
+            {/* Only the owner can edit or delete; ownerless (older) recipes by anyone. */}
+            {(recipe.mine || !recipe.ownerId) && (
+              <Menu
+                label="Recipe actions"
+                items={[
+                  { label: 'Edit', onSelect: () => navigate(`/recipes/${id}/edit`) },
+                  { label: deleting ? 'Deleting…' : 'Delete', onSelect: handleDelete, danger: true },
+                ]}
+              />
+            )}
+          </div>
           {recipe.tags.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1">
               {recipe.tags.map((tag) => (
@@ -140,12 +156,6 @@ export default function RecipeDetail() {
                   ? 'Add to a new shopping list'
                   : 'Add to list'}
           </button>
-          {/* Only the owner can delete; ownerless (older) recipes by anyone. */}
-          {(recipe.mine || !recipe.ownerId) && (
-            <button type="button" className="btn" disabled={deleting} onClick={handleDelete}>
-              {deleting ? 'Deleting…' : 'Delete'}
-            </button>
-          )}
         </div>
         {addError && (
           <p className="text-sm text-red-600 dark:text-red-400" role="alert">

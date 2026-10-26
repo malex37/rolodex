@@ -55,6 +55,7 @@ const operations: {
   ListRecipes: { file: "recipes", write: false },
   GetRecipe: { file: "recipes", write: false },
   CreateRecipe: { file: "recipes", write: true },
+  UpdateRecipe: { file: "recipes", write: true },
   DeleteRecipe: { file: "recipes", write: true },
   FeedRecipe: { file: "feed", write: false },
   ListGroceryLists: { file: "groceries", write: false },

@@ -52,6 +52,12 @@ export default function Layout() {
     return recipe
   }
 
+  const updateRecipe = async (id, changes) => {
+    const { recipe } = await client.updateRecipe({ id, recipe: changes })
+    setRecipes((list) => list.map((r) => (r.id === id ? recipe : r)))
+    return recipe
+  }
+
   const deleteRecipe = async (id) => {
     await client.deleteRecipe({ id })
     setRecipes((list) => list.filter((r) => r.id !== id))
@@ -91,6 +97,7 @@ export default function Layout() {
           recipes,
           recipesError,
           createRecipe,
+          updateRecipe,
           deleteRecipe,
           lists,
           listsError,

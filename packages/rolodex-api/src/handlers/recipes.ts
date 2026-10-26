@@ -74,6 +74,42 @@ export const CreateRecipe = operation("CreateRecipe", async (input, caller) => {
   return { recipe: view(recipe, caller) };
 });
 
+export const UpdateRecipe = operation("UpdateRecipe", async ({ id, recipe: changes }, caller) => {
+  const result = await db.send(
+    new GetCommand({ TableName: tableName(), Key: { pk: RECIPE_PK, sk: id } }),
+  );
+  const existing = result.Item && fromItem(result.Item);
+  if (!existing || (existing.private && !ownedBy(existing, caller))) {
+    throw new NotFoundError("Recipe not found");
+  }
+  // Owner only; ownerless (pre-ownership) recipes can be edited by anyone.
+  if (existing.ownerId && !ownedBy(existing, caller)) {
+    throw new ForbiddenError("Only the recipe's owner can edit it");
+  }
+
+  // Keeps id and the stored ownerId (which may be a legacy identity id).
+  const recipe: Recipe = { ...changes, id, ownerId: existing.ownerId };
+  try {
+    await db.send(
+      new PutCommand({
+        TableName: tableName(),
+        Item: { pk: RECIPE_PK, sk: id, ...recipe, ownerId: existing.ownerId || undefined },
+        // Fails if the recipe was deleted or changed hands since it was read.
+        ConditionExpression: existing.ownerId
+          ? "ownerId = :owner"
+          : "attribute_exists(pk) AND attribute_not_exists(ownerId)",
+        ExpressionAttributeValues: existing.ownerId ? { ":owner": existing.ownerId } : undefined,
+      }),
+    );
+  } catch (err) {
+    if (err instanceof ConditionalCheckFailedException) {
+      throw new NotFoundError("Recipe not found");
+    }
+    throw err;
+  }
+  return { recipe: view(recipe, caller) };
+});
+
 export const DeleteRecipe = operation("DeleteRecipe", async ({ id }, caller) => {
   try {
     await db.send(

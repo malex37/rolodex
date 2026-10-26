@@ -31,6 +31,8 @@ import type {
   UnshareGroceryListOutput,
   UpdateGroceryInput,
   UpdateGroceryOutput,
+  UpdateRecipeInput,
+  UpdateRecipeOutput,
 } from "@rolodex/models";
 import { AwsClient } from "aws4fetch";
 
@@ -83,6 +85,10 @@ export class RolodexClient {
 
   createRecipe(input: CreateRecipeInput): Promise<CreateRecipeOutput> {
     return this.#call("CreateRecipe", input);
+  }
+
+  updateRecipe(input: UpdateRecipeInput): Promise<UpdateRecipeOutput> {
+    return this.#call("UpdateRecipe", input);
   }
 
   deleteRecipe(input: DeleteRecipeInput): Promise<DeleteRecipeOutput> {

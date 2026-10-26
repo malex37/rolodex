@@ -40,7 +40,16 @@ export interface CreateRecipeOutput {
   recipe: RecipeView;
 }
 
-// Only the owner can delete a recipe (Forbidden otherwise).
+// Replaces a recipe's contents. Only the owner can update or delete a recipe
+// (Forbidden otherwise).
+export interface UpdateRecipeInput {
+  id: string;
+  recipe: NewRecipe;
+}
+export interface UpdateRecipeOutput {
+  recipe: RecipeView;
+}
+
 export interface DeleteRecipeInput {
   id: string;
 }
@@ -143,6 +152,7 @@ export interface RolodexOperations {
   ListRecipes: { input: ListRecipesInput; output: ListRecipesOutput };
   GetRecipe: { input: GetRecipeInput; output: GetRecipeOutput };
   CreateRecipe: { input: CreateRecipeInput; output: CreateRecipeOutput };
+  UpdateRecipe: { input: UpdateRecipeInput; output: UpdateRecipeOutput };
   DeleteRecipe: { input: DeleteRecipeInput; output: DeleteRecipeOutput };
   FeedRecipe: { input: FeedRecipeInput; output: FeedRecipeOutput };
   ListGroceryLists: { input: ListGroceryListsInput; output: ListGroceryListsOutput };
@@ -201,6 +211,10 @@ export const inputParsers: {
   ListRecipes: parseEmpty,
   GetRecipe: parseId,
   CreateRecipe: (input) => ({ recipe: parseNewRecipe(asObject(input, "Input").recipe) }),
+  UpdateRecipe: (input) => ({
+    ...parseId(input),
+    recipe: parseNewRecipe(asObject(input, "Input").recipe),
+  }),
   DeleteRecipe: parseId,
   FeedRecipe: parseNytRecipeUri,
   ListGroceryLists: parseEmpty,
