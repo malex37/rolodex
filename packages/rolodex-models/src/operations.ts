@@ -5,7 +5,7 @@ import {
   parseGroceryUpdate,
   parseNewGroceryItems,
 } from "./grocery.ts";
-import { type NewRecipe, type Recipe, parseNewRecipe } from "./recipe.ts";
+import { type NewRecipe, type RecipeView, parseNewRecipe } from "./recipe.ts";
 import { ValidationError, asObject, trimmed } from "./validation.ts";
 
 // Every API operation is `POST /{OperationName}` with a JSON body of
@@ -15,25 +15,29 @@ export type EmptyOutput = Record<string, never>;
 
 // Recipes
 
+// Every user sees all public recipes plus their own private ones; a private
+// recipe owned by someone else is reported as NotFound.
+
 export type ListRecipesInput = Record<string, never>;
 export interface ListRecipesOutput {
-  recipes: Recipe[];
+  recipes: RecipeView[];
 }
 
 export interface GetRecipeInput {
   id: string;
 }
 export interface GetRecipeOutput {
-  recipe: Recipe;
+  recipe: RecipeView;
 }
 
 export interface CreateRecipeInput {
   recipe: NewRecipe;
 }
 export interface CreateRecipeOutput {
-  recipe: Recipe;
+  recipe: RecipeView;
 }
 
+// Only the owner can delete a recipe (Forbidden otherwise).
 export interface DeleteRecipeInput {
   id: string;
 }
@@ -79,7 +83,7 @@ export type DeleteGroceryOutput = EmptyOutput;
 
 // Errors: any non-200 response has this body.
 
-export type ErrorCode = "ValidationError" | "NotFound" | "InternalError";
+export type ErrorCode = "ValidationError" | "Forbidden" | "NotFound" | "InternalError";
 
 export interface ErrorOutput {
   code: ErrorCode;

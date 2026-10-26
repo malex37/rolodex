@@ -32,6 +32,36 @@ export class NotFoundError extends ApiError {
   }
 }
 
+export class ForbiddenError extends ApiError {
+  constructor(message: string) {
+    super(403, "Forbidden", message);
+  }
+}
+
+/** Who is calling: their Cognito identity id. */
+export interface Caller {
+  id: string;
+}
+
+// The IAM authorizer's context. For identity pool credentials it includes the
+// caller's Cognito identity (aws-lambda's types leave this out).
+interface IamAuthorizer {
+  iam?: {
+    userArn?: string;
+    cognitoIdentity?: { identityId?: string } | null;
+  };
+}
+
+function getCaller(event: APIGatewayProxyEventV2): Caller {
+  const authorizer = (event.requestContext as { authorizer?: IamAuthorizer } | undefined)
+    ?.authorizer;
+  // Signed-in users call with identity pool credentials; any other IAM
+  // principal (e.g. an admin invoking directly) is identified by its ARN.
+  const id = authorizer?.iam?.cognitoIdentity?.identityId ?? authorizer?.iam?.userArn;
+  if (!id) throw new ForbiddenError("Caller identity is missing");
+  return { id };
+}
+
 function json(statusCode: number, body: unknown): APIGatewayProxyStructuredResultV2 {
   return {
     statusCode,
@@ -60,12 +90,13 @@ function readBody(event: APIGatewayProxyEventV2): unknown {
 // as `{name}Input`, runs the operation and returns its `{name}Output`.
 export function operation<N extends OperationName>(
   name: N,
-  impl: (input: OperationInput<N>) => Promise<OperationOutput<N>>,
+  impl: (input: OperationInput<N>, caller: Caller) => Promise<OperationOutput<N>>,
 ): Handler {
   return async (event) => {
     try {
+      const caller = getCaller(event);
       const input = inputParsers[name](readBody(event));
-      return json(200, await impl(input));
+      return json(200, await impl(input, caller));
     } catch (err) {
       if (err instanceof ApiError) return error(err.statusCode, err.code, err.message);
       if (err instanceof ValidationError) return error(400, "ValidationError", err.message);

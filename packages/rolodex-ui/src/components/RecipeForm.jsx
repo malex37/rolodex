@@ -11,6 +11,9 @@ export default function RecipeForm({ onSave, onCancel }) {
   const [tags, setTags] = useState('')
   const [ingredients, setIngredients] = useState([{ ...emptyIngredient }])
   const [steps, setSteps] = useState([''])
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [pageUri, setPageUri] = useState('')
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState('')
@@ -39,13 +42,26 @@ export default function RecipeForm({ onSave, onCancel }) {
       list.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
     )
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     if (!name.trim()) return
-    onSave({
-      id: crypto.randomUUID(),
-      ...parseNewRecipe({ name, category, tags: tags.split(','), ingredients, steps }),
-    })
+    setSaving(true)
+    setSaveError('')
+    try {
+      await onSave(
+        parseNewRecipe({
+          name,
+          category,
+          tags: tags.split(','),
+          ingredients,
+          steps,
+          private: isPrivate,
+        }),
+      )
+    } catch (err) {
+      setSaveError(err.message)
+      setSaving(false)
+    }
   }
 
   return (
@@ -159,9 +175,28 @@ export default function RecipeForm({ onSave, onCancel }) {
           </button>
         </fieldset>
 
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-orange-600"
+            checked={isPrivate}
+            onChange={(e) => setIsPrivate(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium">Private</span>
+            <span className="text-stone-500"> — only you can see it</span>
+          </span>
+        </label>
+
+        {saveError && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            {saveError}
+          </p>
+        )}
+
         <div className="flex gap-2">
-          <button type="submit" className="btn btn-primary">
-            Save recipe
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving…' : 'Save recipe'}
           </button>
           <button type="button" className="btn" onClick={onCancel}>
             Cancel

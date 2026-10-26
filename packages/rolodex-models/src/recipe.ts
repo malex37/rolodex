@@ -7,6 +7,10 @@ export interface Ingredient {
 
 export interface Recipe {
   id: string;
+  /** Cognito identity id of the user who created it. */
+  ownerId: string;
+  /** Private recipes are only visible to their owner; others are visible to every user. */
+  private: boolean;
   name: string;
   category: string;
   tags: string[];
@@ -14,7 +18,10 @@ export interface Recipe {
   steps: string[];
 }
 
-export type NewRecipe = Omit<Recipe, "id">;
+export type NewRecipe = Omit<Recipe, "id" | "ownerId">;
+
+/** A recipe as returned to a caller: `mine` is true when the caller owns it. */
+export type RecipeView = Recipe & { mine: boolean };
 
 export const DEFAULT_CATEGORY = "Uncategorized";
 
@@ -35,6 +42,7 @@ export function parseNewRecipe(input: unknown): NewRecipe {
 
   return {
     name,
+    private: data.private === true,
     category: trimmed(data.category) || DEFAULT_CATEGORY,
     tags: stringList(data.tags)
       .map((tag) => tag.trim().toLowerCase())

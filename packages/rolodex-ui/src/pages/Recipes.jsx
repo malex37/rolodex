@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
+import PrivateBadge from '../components/PrivateBadge.jsx'
 
 export default function Recipes() {
-  const { recipes } = useOutletContext()
+  const { recipes: loaded, recipesError } = useOutletContext()
+  const recipes = useMemo(() => loaded ?? [], [loaded])
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get('q') ?? ''
   const category = searchParams.get('category') ?? ''
@@ -65,7 +67,13 @@ export default function Recipes() {
         </Link>
       </div>
 
-      {recipes.length === 0 && (
+      {recipesError && (
+        <p className="text-red-600 dark:text-red-400" role="alert">
+          Couldn’t load recipes: {recipesError}
+        </p>
+      )}
+      {!loaded && !recipesError && <p className="text-stone-500">Loading recipes…</p>}
+      {loaded && recipes.length === 0 && (
         <p className="text-stone-500">No recipes yet. Add your first one!</p>
       )}
       {recipes.length > 0 && grouped.length === 0 && (
@@ -81,7 +89,10 @@ export default function Recipes() {
               to={`/recipes/${recipe.id}`}
               className="card block transition hover:border-orange-400"
             >
-              <h3 className="font-semibold">{recipe.name}</h3>
+              <h3 className="font-semibold">
+                {recipe.name}
+                {recipe.private && <PrivateBadge />}
+              </h3>
               <p className="mt-1 text-sm text-stone-500">
                 {recipe.ingredients.length} ingredients · {recipe.steps.length} steps
               </p>

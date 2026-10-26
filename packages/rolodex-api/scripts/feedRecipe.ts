@@ -8,7 +8,10 @@ import { FeedRecipe } from "../src/handlers/feed.ts";
 async function main() {
   const uri = process.argv[2];
   if (!uri) throw new Error("Usage: feedRecipe.ts <cooking.nytimes.com recipe URL>");
-  const result = await FeedRecipe({ body: JSON.stringify({ uri }) } as APIGatewayProxyEventV2);
+  const result = await FeedRecipe({
+    body: JSON.stringify({ uri }),
+    requestContext: { authorizer: { iam: { userArn: "local" } } },
+  } as unknown as APIGatewayProxyEventV2);
   console.log(result.statusCode);
   console.log(JSON.stringify(JSON.parse(result.body ?? "null"), null, 2));
 }

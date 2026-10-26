@@ -1,10 +1,30 @@
+import { useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import PrivateBadge from '../components/PrivateBadge.jsx'
 
 export default function RecipeDetail() {
   const { id } = useParams()
-  const { recipes, setRecipes, addGroceries } = useOutletContext()
+  const { recipes, recipesError, deleteRecipe, addGroceries } = useOutletContext()
   const navigate = useNavigate()
-  const recipe = recipes.find((r) => r.id === id)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const recipe = recipes?.find((r) => r.id === id)
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteRecipe(id)
+      navigate('/recipes')
+    } catch (err) {
+      setDeleteError(err.message)
+      setDeleting(false)
+    }
+  }
+
+  if (!recipes && !recipesError) {
+    return <p className="text-stone-500">Loading recipe…</p>
+  }
 
   if (!recipe) {
     return (
@@ -26,7 +46,10 @@ export default function RecipeDetail() {
       <div className="card grid gap-4">
         <header>
           <p className="text-sm text-stone-500">{recipe.category}</p>
-          <h2 className="text-2xl font-bold">{recipe.name}</h2>
+          <h2 className="text-2xl font-bold">
+            {recipe.name}
+            {recipe.private && <PrivateBadge />}
+          </h2>
           {recipe.tags.length > 0 && (
             <ul className="mt-2 flex flex-wrap gap-1">
               {recipe.tags.map((tag) => (
@@ -80,17 +103,18 @@ export default function RecipeDetail() {
           >
             Add to groceries
           </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              setRecipes((list) => list.filter((r) => r.id !== id))
-              navigate('/recipes')
-            }}
-          >
-            Delete
-          </button>
+          {/* Only the owner can delete; ownerless (older) recipes by anyone. */}
+          {(recipe.mine || !recipe.ownerId) && (
+            <button type="button" className="btn" disabled={deleting} onClick={handleDelete}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
         </div>
+        {deleteError && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+            {deleteError}
+          </p>
+        )}
       </div>
     </article>
   )
