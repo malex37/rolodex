@@ -4,13 +4,12 @@ import {
   UsernameExistsException,
 } from "@aws-sdk/client-cognito-identity-provider";
 import type { AnyFlags, TypedFlags } from "meow";
-
-// UserPoolId output of the deployed Rolodex stack.
-const DEFAULT_USER_POOL_ID = "us-west-2_hNzHo3owj";
+import { getStackOutput } from "../stack.ts";
 
 export const CreateUserFlags = {
   email: { type: "string", isRequired: true },
-  userPoolId: { type: "string", default: DEFAULT_USER_POOL_ID },
+  // Defaults to the deployed Rolodex stack's UserPoolId output.
+  userPoolId: { type: "string" },
 } satisfies AnyFlags;
 
 export type CreateUserInput = TypedFlags<typeof CreateUserFlags>;
@@ -23,7 +22,8 @@ export type CreateUserInput = TypedFlags<typeof CreateUserFlags>;
  * user a temporary password, which they must change on first sign-in.
  */
 export async function createUser(input: CreateUserInput) {
-  const { email, userPoolId } = input;
+  const { email } = input;
+  const userPoolId = input.userPoolId ?? (await getStackOutput("UserPoolId"));
   // Pool ids are "{region}_{id}".
   const region = userPoolId.split("_")[0];
   const client = new CognitoIdentityProviderClient({ region });

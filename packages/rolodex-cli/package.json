@@ -11,6 +11,7 @@
     "start": "tsx ./src/index.ts --"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudformation": "^3.1156.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1156.0",
     "@rolodex/models": "*",
     "meow": "^14.1.0",
