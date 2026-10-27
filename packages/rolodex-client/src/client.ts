@@ -3,12 +3,16 @@ import type {
   AddGroceriesOutput,
   CreateGroceryListInput,
   CreateGroceryListOutput,
+  CreateGrocerySectionInput,
+  CreateGrocerySectionOutput,
   CreateRecipeInput,
   CreateRecipeOutput,
   DeleteGroceryInput,
   DeleteGroceryListInput,
   DeleteGroceryListOutput,
   DeleteGroceryOutput,
+  DeleteGrocerySectionInput,
+  DeleteGrocerySectionOutput,
   DeleteRecipeInput,
   DeleteRecipeOutput,
   ErrorOutput,
@@ -25,6 +29,8 @@ import type {
   OperationInput,
   OperationName,
   OperationOutput,
+  RenameGrocerySectionInput,
+  RenameGrocerySectionOutput,
   ReorderGroceriesInput,
   ReorderGroceriesOutput,
   ShareGroceryListInput,
@@ -120,6 +126,18 @@ export class RolodexClient {
 
   unshareGroceryList(input: UnshareGroceryListInput): Promise<UnshareGroceryListOutput> {
     return this.#call("UnshareGroceryList", input);
+  }
+
+  createGrocerySection(input: CreateGrocerySectionInput): Promise<CreateGrocerySectionOutput> {
+    return this.#call("CreateGrocerySection", input);
+  }
+
+  renameGrocerySection(input: RenameGrocerySectionInput): Promise<RenameGrocerySectionOutput> {
+    return this.#call("RenameGrocerySection", input);
+  }
+
+  deleteGrocerySection(input: DeleteGrocerySectionInput): Promise<DeleteGrocerySectionOutput> {
+    return this.#call("DeleteGrocerySection", input);
   }
 
   listGroceries(input: ListGroceriesInput): Promise<ListGroceriesOutput> {

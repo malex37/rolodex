@@ -7,6 +7,7 @@ import {
   parseGroceryUpdate,
   parseListName,
   parseNewGroceryItems,
+  parseSectionName,
 } from "./grocery.ts";
 import { type NewRecipe, type RecipeDraft, type RecipeView, parseNewRecipe } from "./recipe.ts";
 import { ValidationError, asObject, stringList, trimmed } from "./validation.ts";
@@ -106,7 +107,37 @@ export interface UnshareGroceryListInput {
 }
 export type UnshareGroceryListOutput = EmptyOutput;
 
-// Grocery items, always within a list
+// Sections of a list, which group its items (say, by store). Any member can
+// add, rename or remove them; each answers with the updated list.
+
+export interface CreateGrocerySectionInput {
+  listId: string;
+  name: string;
+}
+export interface CreateGrocerySectionOutput {
+  list: GroceryListView;
+}
+
+export interface RenameGrocerySectionInput {
+  listId: string;
+  id: string;
+  name: string;
+}
+export interface RenameGrocerySectionOutput {
+  list: GroceryListView;
+}
+
+/** Its items move to the list's main section. */
+export interface DeleteGrocerySectionInput {
+  listId: string;
+  id: string;
+}
+export interface DeleteGrocerySectionOutput {
+  list: GroceryListView;
+}
+
+// Grocery items, always within a list. An item's sectionId must be one of
+// its list's sections (ValidationError otherwise).
 
 export interface ListGroceriesInput {
   listId: string;
@@ -172,6 +203,9 @@ export interface RolodexOperations {
   DeleteGroceryList: { input: DeleteGroceryListInput; output: DeleteGroceryListOutput };
   ShareGroceryList: { input: ShareGroceryListInput; output: ShareGroceryListOutput };
   UnshareGroceryList: { input: UnshareGroceryListInput; output: UnshareGroceryListOutput };
+  CreateGrocerySection: { input: CreateGrocerySectionInput; output: CreateGrocerySectionOutput };
+  RenameGrocerySection: { input: RenameGrocerySectionInput; output: RenameGrocerySectionOutput };
+  DeleteGrocerySection: { input: DeleteGrocerySectionInput; output: DeleteGrocerySectionOutput };
   ListGroceries: { input: ListGroceriesInput; output: ListGroceriesOutput };
   AddGroceries: { input: AddGroceriesInput; output: AddGroceriesOutput };
   UpdateGrocery: { input: UpdateGroceryInput; output: UpdateGroceryOutput };
@@ -242,6 +276,16 @@ export const inputParsers: {
     if (!userId) throw new ValidationError("userId is required");
     return { ...parseId(input), userId };
   },
+  CreateGrocerySection: (input) => ({
+    ...parseListId(input),
+    name: parseSectionName(asObject(input, "Input").name),
+  }),
+  RenameGrocerySection: (input) => ({
+    ...parseListId(input),
+    ...parseId(input),
+    name: parseSectionName(asObject(input, "Input").name),
+  }),
+  DeleteGrocerySection: (input) => ({ ...parseListId(input), ...parseId(input) }),
   ListGroceries: parseListId,
   AddGroceries: (input) => ({
     ...parseListId(input),
