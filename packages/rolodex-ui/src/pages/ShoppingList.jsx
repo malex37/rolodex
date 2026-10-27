@@ -18,8 +18,10 @@ export default function ShoppingList() {
   const [quantity, setQuantity] = useState('')
   const [shareEmail, setShareEmail] = useState('')
   const [sharing, setSharing] = useState(false)
-  // The item being dragged by its handle.
-  const [dragId, setDragId] = useState(null)
+  // The item being dragged by its handle: where its ghost is drawn (fixed
+  // position), and where on the row it was grabbed.
+  const [drag, setDrag] = useState(null)
+  const dragId = drag?.id
   const listRef = useRef(null)
   const itemsRef = useRef(items)
   itemsRef.current = items
@@ -63,17 +65,21 @@ export default function ShoppingList() {
       }
     })
 
-  // While dragging (mouse or touch), the item moves past each row whose middle
-  // the pointer crosses; dropping saves the new order. Listening on window
-  // keeps the drag going when React moves the row in the DOM.
+  // While dragging (mouse or touch), a ghost of the item follows the pointer
+  // and an empty slot opens in the list where it would land: past each row
+  // whose middle the ghost's middle crosses. Dropping saves the new order.
+  // Listening on window keeps the drag going when React moves the slot.
   useEffect(() => {
     if (!dragId) return
     const before = itemsRef.current.map((item) => item.id).join()
+    const { grabY, height } = drag
     const move = (event) => {
+      const top = event.clientY - grabY
+      setDrag((current) => ({ ...current, top }))
       const rows = [...listRef.current.children].filter((row) => row.dataset.id !== dragId)
       const index = rows.filter((row) => {
-        const { top, height } = row.getBoundingClientRect()
-        return top + height / 2 < event.clientY
+        const rect = row.getBoundingClientRect()
+        return rect.top + rect.height / 2 < top + height / 2
       }).length
       setItems((current) => {
         const item = current.find((i) => i.id === dragId)
@@ -83,19 +89,21 @@ export default function ShoppingList() {
       })
     }
     const drop = () => {
-      setDragId(null)
+      setDrag(null)
       const ordered = itemsRef.current
       if (ordered.map((item) => item.id).join() !== before) saveOrder(ordered)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', drop)
     window.addEventListener('pointercancel', drop)
+    document.body.style.cursor = 'grabbing'
     return () => {
+      document.body.style.cursor = ''
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', drop)
       window.removeEventListener('pointercancel', drop)
     }
-    // saveOrder only uses values that stay the same during a drag.
+    // drag (its grab point and size) and saveOrder stay the same during a drag.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragId])
 
@@ -195,6 +203,57 @@ export default function ShoppingList() {
     })
   }
 
+  // Starts dragging the item whose handle was pressed, with its ghost drawn
+  // exactly over its row.
+  const startDrag = (event, item) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    const { top, left, width, height } = event.currentTarget.closest('li').getBoundingClientRect()
+    setDrag({ id: item.id, top, left, width, height, grabY: event.clientY - top })
+  }
+
+  const rowContent = (item) => (
+    <>
+      <button
+        type="button"
+        className={`touch-none rounded px-2 text-lg text-stone-400 select-none hover:text-stone-600 ${
+          drag ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+        aria-label={`Move ${item.name} (arrow keys)`}
+        onPointerDown={(e) => startDrag(e, item)}
+        onKeyDown={(e) => handleKey(e, item)}
+      >
+        ⠿
+      </button>
+      <label
+        className={`flex flex-1 cursor-pointer items-center gap-3 ${
+          item.done ? 'text-stone-400 line-through' : ''
+        }`}
+      >
+        <input
+          type="checkbox"
+          className="size-4 accent-orange-600"
+          checked={item.done}
+          onChange={() => toggle(item)}
+        />
+        <span>
+          {item.quantity && <strong>{item.quantity} </strong>}
+          {item.name}
+        </span>
+      </label>
+      <button
+        type="button"
+        className="rounded px-2 text-lg text-stone-400 hover:text-red-600"
+        aria-label={`Remove ${item.name}`}
+        onClick={() => remove(item)}
+      >
+        ×
+      </button>
+    </>
+  )
+  const rowClass = 'flex items-center gap-2 py-2 pr-4 pl-1'
+  const dragged = drag && items.find((item) => item.id === drag.id)
+
   const isMe = (member) => member.email.toLowerCase() === email?.toLowerCase()
   const me = list.members.find(isMe)
   const others = list.members.filter((m) => m.id !== list.ownerId)
@@ -240,56 +299,32 @@ export default function ShoppingList() {
       {items?.length === 0 && <p className="text-stone-500">Nothing to buy.</p>}
       {items?.length > 0 && (
         <ul ref={listRef} className="card divide-y divide-stone-200 p-0 dark:divide-stone-700">
-          {items.map((item) => (
-            <li
-              key={item.id}
-              data-id={item.id}
-              className={`flex items-center gap-2 py-2 pr-4 pl-1 ${
-                item.id === dragId ? 'relative z-10 bg-orange-50 shadow-md dark:bg-stone-800' : ''
-              }`}
-            >
-              <button
-                type="button"
-                className={`touch-none rounded px-2 text-lg text-stone-400 select-none hover:text-stone-600 ${
-                  dragId ? 'cursor-grabbing' : 'cursor-grab'
-                }`}
-                aria-label={`Move ${item.name} (arrow keys)`}
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return
-                  e.preventDefault()
-                  setDragId(item.id)
-                }}
-                onKeyDown={(e) => handleKey(e, item)}
-              >
-                ⠿
-              </button>
-              <label
-                className={`flex flex-1 cursor-pointer items-center gap-3 ${
-                  item.done ? 'text-stone-400 line-through' : ''
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="size-4 accent-orange-600"
-                  checked={item.done}
-                  onChange={() => toggle(item)}
-                />
-                <span>
-                  {item.quantity && <strong>{item.quantity} </strong>}
-                  {item.name}
-                </span>
-              </label>
-              <button
-                type="button"
-                className="rounded px-2 text-lg text-stone-400 hover:text-red-600"
-                aria-label={`Remove ${item.name}`}
-                onClick={() => remove(item)}
-              >
-                ×
-              </button>
-            </li>
-          ))}
+          {items.map((item) =>
+            item.id === dragId ? (
+              // The empty slot the dragged item would land in.
+              <li
+                key={item.id}
+                data-id={item.id}
+                aria-hidden
+                className="bg-stone-100 dark:bg-stone-900"
+                style={{ height: drag.height }}
+              />
+            ) : (
+              <li key={item.id} data-id={item.id} className={rowClass}>
+                {rowContent(item)}
+              </li>
+            ),
+          )}
         </ul>
+      )}
+      {dragged && (
+        <div
+          inert
+          className={`card pointer-events-none fixed z-50 shadow-xl ring-2 ring-orange-400/60 ${rowClass}`}
+          style={{ top: drag.top, left: drag.left, width: drag.width }}
+        >
+          {rowContent(dragged)}
+        </div>
       )}
 
       {items?.some((item) => item.done) && (
