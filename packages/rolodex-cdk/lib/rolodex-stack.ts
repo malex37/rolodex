@@ -67,6 +67,7 @@ const operations: {
   AddGroceries: { file: "groceries", write: true },
   UpdateGrocery: { file: "groceries", write: true },
   DeleteGrocery: { file: "groceries", write: true },
+  ReorderGroceries: { file: "groceries", write: true },
 };
 
 export interface RolodexStackProps extends StackProps {

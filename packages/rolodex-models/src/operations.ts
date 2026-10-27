@@ -9,7 +9,7 @@ import {
   parseNewGroceryItems,
 } from "./grocery.ts";
 import { type NewRecipe, type RecipeDraft, type RecipeView, parseNewRecipe } from "./recipe.ts";
-import { ValidationError, asObject, trimmed } from "./validation.ts";
+import { ValidationError, asObject, stringList, trimmed } from "./validation.ts";
 
 // Every API operation is `POST /{OperationName}` with a JSON body of
 // `{OperationName}Input`, answering 200 with `{OperationName}Output`.
@@ -138,6 +138,17 @@ export interface DeleteGroceryInput {
 }
 export type DeleteGroceryOutput = EmptyOutput;
 
+/**
+ * Puts the list's items in the order of `ids`. Items missing from `ids` (say,
+ * added by another member meanwhile) keep their place after them; unknown ids
+ * are ignored.
+ */
+export interface ReorderGroceriesInput {
+  listId: string;
+  ids: string[];
+}
+export type ReorderGroceriesOutput = EmptyOutput;
+
 // Errors: any non-200 response has this body.
 
 export type ErrorCode = "ValidationError" | "Forbidden" | "NotFound" | "InternalError";
@@ -165,6 +176,7 @@ export interface RolodexOperations {
   AddGroceries: { input: AddGroceriesInput; output: AddGroceriesOutput };
   UpdateGrocery: { input: UpdateGroceryInput; output: UpdateGroceryOutput };
   DeleteGrocery: { input: DeleteGroceryInput; output: DeleteGroceryOutput };
+  ReorderGroceries: { input: ReorderGroceriesInput; output: ReorderGroceriesOutput };
 }
 
 export type OperationName = keyof RolodexOperations;
@@ -241,4 +253,11 @@ export const inputParsers: {
     changes: parseGroceryUpdate(asObject(input, "Input").changes),
   }),
   DeleteGrocery: (input) => ({ ...parseListId(input), ...parseId(input) }),
+  ReorderGroceries: (input) => {
+    const ids = [...new Set(stringList(asObject(input, "Input").ids).map((id) => id.trim()))];
+    if (ids.length === 0 || ids.some((id) => !id)) {
+      throw new ValidationError("ids must be a non-empty array of item ids");
+    }
+    return { ...parseListId(input), ids };
+  },
 };

@@ -25,6 +25,8 @@ import type {
   OperationInput,
   OperationName,
   OperationOutput,
+  ReorderGroceriesInput,
+  ReorderGroceriesOutput,
   ShareGroceryListInput,
   ShareGroceryListOutput,
   UnshareGroceryListInput,
@@ -134,6 +136,10 @@ export class RolodexClient {
 
   deleteGrocery(input: DeleteGroceryInput): Promise<DeleteGroceryOutput> {
     return this.#call("DeleteGrocery", input);
+  }
+
+  reorderGroceries(input: ReorderGroceriesInput): Promise<ReorderGroceriesOutput> {
+    return this.#call("ReorderGroceries", input);
   }
 
   async #call<N extends OperationName>(

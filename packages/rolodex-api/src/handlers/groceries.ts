@@ -69,8 +69,15 @@ function view(list: GroceryList, caller: Caller): GroceryListView {
   return { ...list, mine: list.ownerId === caller.id };
 }
 
-function itemFromRow({ pk: _pk, sk: _sk, ...item }: Record<string, unknown>): GroceryItem {
+// Item rows also store a position; ListGroceries returns them sorted by it.
+function itemFromRow(row: Record<string, unknown>): GroceryItem {
+  const { pk: _pk, sk: _sk, position: _position, ...item } = row;
   return item as unknown as GroceryItem;
+}
+
+// Items saved before positions existed sort first, in key order.
+function byPosition(a: Record<string, unknown>, b: Record<string, unknown>) {
+  return Number(a.position ?? 0) - Number(b.position ?? 0);
 }
 
 /** The list if the caller is a member; anyone else gets NotFound. */
@@ -158,7 +165,8 @@ export const UnshareGroceryList = operation(
 
 export const ListGroceries = operation("ListGroceries", async ({ listId }, caller) => {
   await getList(listId, caller);
-  return { items: (await queryAll(groceryItemsPk(listId))).map(itemFromRow) };
+  const rows = await queryAll(groceryItemsPk(listId));
+  return { items: rows.sort(byPosition).map(itemFromRow) };
 });
 
 // Takes several items so a recipe's ingredients can be added in one call.
@@ -169,9 +177,14 @@ export const AddGroceries = operation("AddGroceries", async ({ listId, items }, 
     ...item,
     done: false,
   }));
+  // Timestamps sort after the small positions ReorderGroceries assigns, so
+  // new items go to the end of the list.
+  const now = Date.now();
   await batchWrite(
-    added.map((item) => ({
-      PutRequest: { Item: { pk: groceryItemsPk(listId), sk: item.id, ...item } },
+    added.map((item, i) => ({
+      PutRequest: {
+        Item: { pk: groceryItemsPk(listId), sk: item.id, ...item, position: now + i },
+      },
     })),
   );
   return { items: added };
@@ -210,6 +223,42 @@ export const DeleteGrocery = operation("DeleteGrocery", async ({ listId, id }, c
   await getList(listId, caller);
   await db.send(
     new DeleteCommand({ TableName: tableName(), Key: { pk: groceryItemsPk(listId), sk: id } }),
+  );
+  return {};
+});
+
+export const ReorderGroceries = operation("ReorderGroceries", async ({ listId, ids }, caller) => {
+  await getList(listId, caller);
+  const rows = (await queryAll(groceryItemsPk(listId))).sort(byPosition);
+  const rank = new Map(ids.map((id, i) => [id, i]));
+  // The given ids first, in their order; the rest after them, as they were.
+  const ordered = [
+    ...rows.filter((row) => rank.has(row.sk as string)).sort(
+      (a, b) => rank.get(a.sk as string)! - rank.get(b.sk as string)!,
+    ),
+    ...rows.filter((row) => !rank.has(row.sk as string)),
+  ];
+  const moved = ordered
+    .map((row, position) => ({ row, position }))
+    .filter(({ row, position }) => row.position !== position);
+  await Promise.all(
+    moved.map(({ row, position }) =>
+      db
+        .send(
+          new UpdateCommand({
+            TableName: tableName(),
+            Key: { pk: row.pk, sk: row.sk },
+            UpdateExpression: "SET #position = :position",
+            ConditionExpression: "attribute_exists(pk)",
+            ExpressionAttributeNames: { "#position": "position" },
+            ExpressionAttributeValues: { ":position": position },
+          }),
+        )
+        // Deleted meanwhile; nothing to place.
+        .catch((error) => {
+          if (!(error instanceof ConditionalCheckFailedException)) throw error;
+        }),
+    ),
   );
   return {};
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider.jsx'
 import { sharingSummary } from '../groceryLists.js'
@@ -18,6 +18,11 @@ export default function ShoppingList() {
   const [quantity, setQuantity] = useState('')
   const [shareEmail, setShareEmail] = useState('')
   const [sharing, setSharing] = useState(false)
+  // The item being dragged by its handle.
+  const [dragId, setDragId] = useState(null)
+  const listRef = useRef(null)
+  const itemsRef = useRef(items)
+  itemsRef.current = items
 
   // Runs an action, showing its error instead of throwing.
   const attempt = async (action) => {
@@ -46,6 +51,53 @@ export default function ShoppingList() {
     document.addEventListener('visibilitychange', onFocus)
     return () => document.removeEventListener('visibilitychange', onFocus)
   }, [list, loadItems])
+
+  // Saves the order, reloading the list if that fails.
+  const saveOrder = (ordered) =>
+    attempt(async () => {
+      try {
+        await client.reorderGroceries({ listId, ids: ordered.map((item) => item.id) })
+      } catch (err) {
+        loadItems()
+        throw err
+      }
+    })
+
+  // While dragging (mouse or touch), the item moves past each row whose middle
+  // the pointer crosses; dropping saves the new order. Listening on window
+  // keeps the drag going when React moves the row in the DOM.
+  useEffect(() => {
+    if (!dragId) return
+    const before = itemsRef.current.map((item) => item.id).join()
+    const move = (event) => {
+      const rows = [...listRef.current.children].filter((row) => row.dataset.id !== dragId)
+      const index = rows.filter((row) => {
+        const { top, height } = row.getBoundingClientRect()
+        return top + height / 2 < event.clientY
+      }).length
+      setItems((current) => {
+        const item = current.find((i) => i.id === dragId)
+        if (current.indexOf(item) === index) return current
+        const rest = current.filter((i) => i !== item)
+        return [...rest.slice(0, index), item, ...rest.slice(index)]
+      })
+    }
+    const drop = () => {
+      setDragId(null)
+      const ordered = itemsRef.current
+      if (ordered.map((item) => item.id).join() !== before) saveOrder(ordered)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', drop)
+    window.addEventListener('pointercancel', drop)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', drop)
+      window.removeEventListener('pointercancel', drop)
+    }
+    // saveOrder only uses values that stay the same during a drag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragId])
 
   if (!lists && !listsError) return <p className="text-stone-500">Loading shopping list…</p>
   if (!list) {
@@ -95,6 +147,18 @@ export default function ShoppingList() {
       await Promise.all(bought.map((item) => client.deleteGrocery({ listId, id: item.id })))
       setItems((current) => current.filter((item) => !item.done))
     })
+
+  // Arrow keys on a focused handle move its item one place.
+  const handleKey = (event, item) => {
+    const step = { ArrowUp: -1, ArrowDown: 1 }[event.key]
+    const index = items.indexOf(item) + (step ?? 0)
+    if (!step || index < 0 || index >= items.length) return
+    event.preventDefault()
+    const rest = items.filter((i) => i.id !== item.id)
+    const ordered = [...rest.slice(0, index), item, ...rest.slice(index)]
+    setItems(ordered)
+    saveOrder(ordered)
+  }
 
   const handleShare = (event) => {
     event.preventDefault()
@@ -175,11 +239,32 @@ export default function ShoppingList() {
       {!items && <p className="text-stone-500">Loading items…</p>}
       {items?.length === 0 && <p className="text-stone-500">Nothing to buy.</p>}
       {items?.length > 0 && (
-        <ul className="card divide-y divide-stone-200 p-0 dark:divide-stone-700">
+        <ul ref={listRef} className="card divide-y divide-stone-200 p-0 dark:divide-stone-700">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center justify-between px-4 py-2">
+            <li
+              key={item.id}
+              data-id={item.id}
+              className={`flex items-center gap-2 py-2 pr-4 pl-1 ${
+                item.id === dragId ? 'relative z-10 bg-orange-50 shadow-md dark:bg-stone-800' : ''
+              }`}
+            >
+              <button
+                type="button"
+                className={`touch-none rounded px-2 text-lg text-stone-400 select-none hover:text-stone-600 ${
+                  dragId ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+                aria-label={`Move ${item.name} (arrow keys)`}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return
+                  e.preventDefault()
+                  setDragId(item.id)
+                }}
+                onKeyDown={(e) => handleKey(e, item)}
+              >
+                ⠿
+              </button>
               <label
-                className={`flex cursor-pointer items-center gap-3 ${
+                className={`flex flex-1 cursor-pointer items-center gap-3 ${
                   item.done ? 'text-stone-400 line-through' : ''
                 }`}
               >
