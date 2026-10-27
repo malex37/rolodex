@@ -3,6 +3,9 @@ import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom
 import { useAuth } from '../auth/AuthProvider.jsx'
 import { sharingSummary } from '../groceryLists.js'
 
+// How long a bought item takes to swipe off; matches duration-300 below.
+const SWIPE_MS = 300
+
 const errorClass = 'text-sm text-red-600 dark:text-red-400'
 
 export default function ShoppingList() {
@@ -22,6 +25,9 @@ export default function ShoppingList() {
   // position), and where on the row it was grabbed.
   const [drag, setDrag] = useState(null)
   const dragId = drag?.id
+  // A bought item swipes off to the right, then reappears at the end.
+  const [swipingId, setSwipingId] = useState(null)
+  const [arrivedId, setArrivedId] = useState(null)
   const listRef = useRef(null)
   const itemsRef = useRef(items)
   itemsRef.current = items
@@ -133,15 +139,45 @@ export default function ShoppingList() {
     })
   }
 
-  const toggle = (item) =>
-    attempt(async () => {
+  const toggle = (item) => {
+    if (!item.done) return markBought(item)
+    return attempt(async () => {
       const { item: updated } = await client.updateGrocery({
         listId,
         id: item.id,
-        changes: { done: !item.done },
+        changes: { done: false },
       })
       setItems((current) => current.map((i) => (i.id === item.id ? updated : i)))
     })
+  }
+
+  // Checks the item off at once and swipes it away; once saved and swiped, it
+  // moves to the end of the list and that order is saved too.
+  const markBought = (item) => {
+    if (swipingId) return
+    const replace = (changed) =>
+      setItems((current) => current.map((i) => (i.id === item.id ? changed : i)))
+    replace({ ...item, done: true })
+    setSwipingId(item.id)
+    const swipe = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SWIPE_MS
+    return attempt(async () => {
+      try {
+        const [{ item: updated }] = await Promise.all([
+          client.updateGrocery({ listId, id: item.id, changes: { done: true } }),
+          new Promise((resolve) => setTimeout(resolve, swipe)),
+        ])
+        const ordered = [...itemsRef.current.filter((i) => i.id !== item.id), updated]
+        setItems(ordered)
+        setArrivedId(item.id)
+        saveOrder(ordered)
+      } catch (err) {
+        replace(item)
+        throw err
+      } finally {
+        setSwipingId(null)
+      }
+    })
+  }
 
   const remove = (item) =>
     attempt(async () => {
@@ -298,7 +334,10 @@ export default function ShoppingList() {
       {!items && <p className="text-stone-500">Loading items…</p>}
       {items?.length === 0 && <p className="text-stone-500">Nothing to buy.</p>}
       {items?.length > 0 && (
-        <ul ref={listRef} className="card divide-y divide-stone-200 p-0 dark:divide-stone-700">
+        <ul
+          ref={listRef}
+          className="card divide-y divide-stone-200 overflow-hidden p-0 dark:divide-stone-700"
+        >
           {items.map((item) =>
             item.id === dragId ? (
               // The empty slot the dragged item would land in.
@@ -310,7 +349,16 @@ export default function ShoppingList() {
                 style={{ height: drag.height }}
               />
             ) : (
-              <li key={item.id} data-id={item.id} className={rowClass}>
+              <li
+                key={item.id}
+                data-id={item.id}
+                className={`${rowClass} ${
+                  item.id === swipingId
+                    ? 'translate-x-full opacity-0 motion-safe:transition motion-safe:duration-300'
+                    : ''
+                } ${item.id === arrivedId ? 'motion-safe:animate-[fade-in_300ms_ease-out]' : ''}`}
+                onAnimationEnd={() => setArrivedId(null)}
+              >
                 {rowContent(item)}
               </li>
             ),
